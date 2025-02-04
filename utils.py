@@ -1,5 +1,10 @@
-# utils.py
 def clean_text(text):
-    """Replace special characters like bullet points and fix encoding issues."""
-    text = text.replace("•", "*").replace("ΓÇó", "*").strip()
-    return text
+    """Fix encoding issues and remove unwanted characters from text."""
+    if isinstance(text, dict):  # Prevents breaking structured data
+        return text
+    return (
+        text.replace("ΓÇó", "*")
+        .replace("╬ô├ç├│", "*")
+        .replace("\u2022", "*")  # Handles bullet points
+        .strip()
+    )
