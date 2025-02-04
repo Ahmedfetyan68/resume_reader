@@ -1,7 +1,7 @@
 import re
 from utils import clean_text
 
-# Expand job title pattern to capture more roles 
+# Expand job title pattern to capture more roles
 JOB_TITLE_PATTERN = (
     r"^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*"
     r"(?:\s(Senior|Lead|Intern|Engineer|Manager|Analyst|Consultant|Developer|"
@@ -9,7 +9,10 @@ JOB_TITLE_PATTERN = (
 )
 
 def extract_experience(experience_section):
-    """Extract structured experience data with position, company, and description."""
+    """
+    Extract structured experience data with position, company, and description.
+    Uses JOB_TITLE_PATTERN to detect new positions, then everything else goes under 'Company' or 'Responsibilities'.
+    """
     experiences = []
     current_experience = {}
 
@@ -22,6 +25,7 @@ def extract_experience(experience_section):
             if current_experience:
                 experiences.append(current_experience)
                 current_experience = {}
+
             current_experience["Position"] = line
 
         # Detect company name (usually follows job title)
@@ -42,7 +46,10 @@ def extract_experience(experience_section):
 
 
 def extract_education(education_section):
-    """Extract structured education data with university, degree, field, and dates."""
+    """
+    Extract structured education data with university, degree, field, and basic year ranges (e.g., 2018–2022).
+    If you also want month-year detection (e.g., 'Sep 2020 – Jun 2024'), see postprocess_education_dates below.
+    """
     education_list = []
     current_edu = {}
 
@@ -64,12 +71,17 @@ def extract_education(education_section):
         elif re.search(r"(Bachelor|Master|PhD|B\.Sc|BA|MA|MS|M\.Sc|MBA)", line, re.IGNORECASE):
             current_edu["Degree"] = line
 
-        # Detect field of study (expanding beyond the original 3)
-        elif re.search(r"(Computer Science|Engineering|Business|Information Technology|Marketing|Finance|"
-                       r"Accounting|Economics|Data Science)", line, re.IGNORECASE):
+        # Detect field of study
+        elif re.search(
+            r"(Computer Science|Engineering|Business|Information Technology|Marketing|Finance|"
+            r"Accounting|Economics|Data Science)",
+            line,
+            re.IGNORECASE
+        ):
             current_edu["Field"] = line
 
-        # Detect years like 2018–2022 or 2018-2022
+        # Detect years like 2018–2022 or 2018-2022 (digits only).
+        # If your education includes month-year, you'll handle that with postprocess_education_dates below.
         elif re.search(r"\d{4}\s*[–-]\s*\d{4}", line):
             years = re.findall(r"\d{4}", line)
             if len(years) >= 1:
@@ -89,7 +101,7 @@ def extract_education(education_section):
 def extract_skills(skills_section):
     """
     Extracts a clean list of skills, merging lines by commas or semicolons.
-    Also strips out lines explicitly labeled as "Skills:" or "Technical:".
+    Also strips out lines explicitly labeled as 'Skills:' or 'Technical:'.
     """
     skills = []
 
@@ -108,3 +120,61 @@ def extract_skills(skills_section):
                 skills.append(p)
 
     return skills if skills else ["No skills found"]
+
+
+# === Post-Processing Patterns & Functions ===
+
+# For EXPERIENCE date ranges (month-year or 'Present')
+DATE_PATTERN_EXPERIENCE = re.compile(
+    r"("
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}"
+    r"|\d{4}"
+    r"|Present"
+    r")"
+    r"\s?[–-]\s?"
+    r"("
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}"
+    r"|\d{4}"
+    r"|Present"
+    r")",
+    re.IGNORECASE
+)
+
+def postprocess_experience_dates(experiences):
+    """
+    For each experience entry, if there's a month-year or 'Present' date range
+    in 'Position' like 'August 2022 – October 2022',
+    extract it, then store it in 'Start Date'/'End Date',
+    and remove it from the 'Position' text.
+    """
+    for exp in experiences:
+        position = exp.get("Position", "")
+        if position:
+            match = DATE_PATTERN_EXPERIENCE.search(position)
+            if match:
+                exp["Start Date"] = match.group(1).strip()
+                exp["End Date"] = match.group(2).strip()
+                # Remove the date range from the Position text
+                position_cleaned = DATE_PATTERN_EXPERIENCE.sub("", position).strip()
+                exp["Position"] = position_cleaned
+    return experiences
+
+
+# OPTIONAL: If you also want to handle month-year + 'Present' in EDUCATION
+
+
+
+def postprocess_education_dates(education_list):
+ 
+    
+    for edu in education_list:
+        uni_text = edu.get("University", "")
+        match = DATE_PATTERN_EXPERIENCE.search(uni_text)
+        if match:
+            edu["Start Year"] = match.group(1)
+            edu["End Year"] = match.group(2)
+            # Remove from the University text
+            cleaned_uni = DATE_PATTERN_EXPERIENCE.sub("", uni_text).strip()
+            edu["University"] = cleaned_uni
+    return education_list
+
