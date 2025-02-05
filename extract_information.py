@@ -5,21 +5,31 @@ from utils import clean_text
 # Existing Extraction Functions
 # ------------------------------
 
+
+
+# Optional: Pattern to remove bullet symbols and leading whitespace
+BULLET_PATTERN = r"^[\u2022-]*\s*"
+
+# Updated JOB_TITLE_PATTERN: Note that "Project" has been removed.
+JOB_TITLE_PATTERN = (
+    BULLET_PATTERN +
+    r"[A-Z][a-z]+(?:\s[A-Z][a-z]+)*" +
+    r"(?:\s(Senior|Lead|Intern|Internship|Engineer|Manager|Analyst|Consultant|Developer|"
+    r"Specialist|Director|Scientist|Owner|Sales|Software|Data|Product|Technical))+"
+)
+
+
 def extract_experience(experience_section):
     """Extract structured experience data with position, company, and description."""
     experiences = []
     current_experience = {}
 
-    # Example job title pattern
-    JOB_TITLE_PATTERN = (
-        r"^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*"
-        r"(?:\s(Senior|Lead|Intern|Engineer|Manager|Analyst|Consultant|Developer|"
-        r"Specialist|Director|Scientist|Owner|Sales|Software|Data|Product)){1,}"
-    )
-
     for line in experience_section:
         line = clean_text(line)
+
+        # Use the updated pattern for job titles
         if re.match(JOB_TITLE_PATTERN, line):
+            # If we've already been tracking an experience, finalize it
             if current_experience:
                 experiences.append(current_experience)
                 current_experience = {}
@@ -33,8 +43,8 @@ def extract_experience(experience_section):
 
     if current_experience:
         experiences.append(current_experience)
-    return experiences if experiences else ["No experience data found"]
 
+    return experiences if experiences else ["No experience data found"]
 
 def extract_education(education_section):
     """Extract structured education data with university, degree, field, and basic year ranges."""
