@@ -178,3 +178,89 @@ def postprocess_education_dates(education_list):
             edu["University"] = cleaned_uni
     return education_list
 
+
+
+def postprocess_projects(raw_projects):
+    """
+    Takes the list of lines from 'Projects' and returns a list of dictionaries.
+    E.g., from:
+      ["Projects", "Music Store Website", "* Built...", "Finance Program", "* Developed..."]
+    to:
+      [
+        {"Title": "Music Store Website", "Description": "Built..."},
+        {"Title": "Finance Program", "Description": "Developed..."},
+      ]
+
+    If a project doesn't have a matching description line, we store None or an empty string.
+    """
+    projects_clean = []
+    project_entries = []  # We'll build a list of dicts like [{"Title":..., "Description":...}]
+
+    # 1) Filter out headings or empty lines
+    unwanted_headings = {"projects", "project"}  # can be lowercase for easy checking
+
+    for line in raw_projects:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue  # skip empty
+        # If it's exactly "Projects" or "projects", skip
+        if line_stripped.lower() in unwanted_headings:
+            continue
+        projects_clean.append(line_stripped)
+
+    # 2) Now parse out pairs (Title, Description)
+    # We'll assume a pattern: 
+    #  - "Title line" does NOT start with "*"
+    #  - The next line (if any) that starts with "*" is its description
+    # For lines that don't follow this pattern, we keep them in Title but no description.
+
+    i = 0
+    while i < len(projects_clean):
+        title_line = projects_clean[i]
+        title_line_clean = title_line.lstrip("*").strip()  # remove any leading asterisks/spaces
+        description_line = None
+
+        # Check if there is a next line starting with "*"
+        if i + 1 < len(projects_clean) and projects_clean[i+1].startswith("*"):
+            # next line is a description
+            desc = projects_clean[i+1].lstrip("*").strip()
+            description_line = desc
+            i += 2  # skip the next line because we used it
+        else:
+            i += 1  # just move on
+
+        project_entries.append({
+            "Title": title_line_clean,
+            "Description": description_line or ""
+        })
+
+    return project_entries
+
+
+def postprocess_skills(raw_skills):
+    """
+    Removes heading lines like 'Skills', 'Languages:', 'Technical:', etc.
+    """
+    cleaned_skills = []
+    unwanted_headings = {"skills", "languages", "technical"}  # can expand if you want
+
+    for line in raw_skills:
+        line_stripped = line.strip()
+        if not line_stripped:
+            continue
+        # If line is exactly "Skills" or "skills"
+        if line_stripped.lower() in unwanted_headings:
+            continue
+
+        # If line contains "Languages:" or "Technical:", remove the prefix
+        # e.g. "Languages: Fluent in English." => "Fluent in English."
+        # e.g. "Technical: C++, Java" => "C++, Java"
+        for heading in ["Languages:", "Skills:", "Technical:"]:
+            if heading.lower() in line_stripped.lower():
+                line_stripped = line_stripped.replace(heading, "", 1).strip()
+
+        cleaned_skills.append(line_stripped)
+
+    return cleaned_skills
+
+
