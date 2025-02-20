@@ -19,23 +19,29 @@ JOB_TITLE_PATTERN = (
 )
 
 
+
 def extract_experience(experience_section):
     """Extract structured experience data with position, company, and description."""
     experiences = []
     current_experience = {}
 
+    if not experience_section:
+        return []  # Ensure we return an empty list instead of a string
+
     for line in experience_section:
         line = clean_text(line)
 
-        # Use the updated pattern for job titles
+        # Detect job title pattern
         if re.match(JOB_TITLE_PATTERN, line):
-            # If we've already been tracking an experience, finalize it
             if current_experience:
                 experiences.append(current_experience)
                 current_experience = {}
+
             current_experience["Position"] = line
+
         elif current_experience and "Company" not in current_experience:
             current_experience["Company"] = line
+        
         else:
             if "Responsibilities" not in current_experience:
                 current_experience["Responsibilities"] = []
@@ -44,15 +50,21 @@ def extract_experience(experience_section):
     if current_experience:
         experiences.append(current_experience)
 
-    return experiences if experiences else ["No experience data found"]
+    return experiences  # Always return a list
+
+
 
 def extract_education(education_section):
     """Extract structured education data with university, degree, field, and basic year ranges."""
     education_list = []
     current_edu = {}
 
+    if not education_section:
+        return []  # ✅ Always return an empty list, never a string
+
     for line in education_section:
         line = clean_text(line)
+
         # Detect university/institution lines
         if re.match(
             r"^[A-Z][a-z]+(?:\s[A-Z][a-z]+)*(?:\s(University|Academy|College|Institute|School|Polytechnic|Institute of Technology))",
@@ -62,16 +74,19 @@ def extract_education(education_section):
                 education_list.append(current_edu)
                 current_edu = {}
             current_edu["University"] = line
+
         # Detect degree
         elif re.search(r"(Bachelor|Master|PhD|B\.Sc|BA|MA|MS|M\.Sc|MBA)", line, re.IGNORECASE):
             current_edu["Degree"] = line
-        # Detect field
+
+        # Detect field of study
         elif re.search(
             r"(Computer Science|Engineering|Business|Information Technology|Marketing|Finance|Accounting|Economics|Data Science)",
             line,
             re.IGNORECASE,
         ):
             current_edu["Field"] = line
+
         # Detect year range (this may be further refined via postprocessing)
         elif re.search(r"\d{4}\s*[–-]\s*\d{4}", line):
             years = re.findall(r"\d{4}", line)
@@ -84,8 +99,8 @@ def extract_education(education_section):
 
     if current_edu:
         education_list.append(current_edu)
-    return education_list if education_list else ["No education data found"]
 
+    return education_list  # ✅ Always return a list
 
 def extract_skills(skills_section):
     """
@@ -118,7 +133,37 @@ DATE_PATTERN_EXPERIENCE = re.compile(
     re.IGNORECASE,
 )
 
+DATE_PATTERN_EDU = re.compile(
+    r"("  # Group(1): month-year, year-only, or Present
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|\d{4}|Present"
+    r")\s?[–-]\s?("  # Group(2)
+    r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|\d{4}|Present"
+    r")",
+    re.IGNORECASE,
+)
+
+
 def postprocess_experience_dates(experiences):
+    """
+    For each experience entry, if a date range is found in the 'Position' string,
+    extract and remove it, storing in 'Start Date' and 'End Date'.
+    """
+    for exp in experiences:
+        if not isinstance(exp, dict):  # Ensure exp is a dictionary
+            print(f"Unexpected data format in experiences: {exp}")
+            continue  # Skip invalid entries
+        
+        position = exp.get("Position", "")
+        if position:
+            match = DATE_PATTERN_EXPERIENCE.search(position)
+            if match:
+                exp["Start Date"] = match.group(1).strip()
+                exp["End Date"] = match.group(2).strip()
+                # Remove the matched date range from the position text
+                exp["Position"] = DATE_PATTERN_EXPERIENCE.sub("", position).strip()
+    
+    return experiences
+
     """
     For each experience entry, if a date range is found in the 'Position' string,
     extract and remove it, storing in 'Start Date' and 'End Date'.
@@ -137,16 +182,15 @@ def postprocess_experience_dates(experiences):
 
 # (B) Postprocess Dates for Education
 def postprocess_education_dates(education_list):
-    # Using the same combined DATE_RANGE_PATTERN as for experience.
-    DATE_PATTERN_EDU = re.compile(
-        r"("  
-        r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|\d{4}|Present"
-        r")\s?[–-]\s?("
-        r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s?\d{4}|\d{4}|Present"
-        r")",
-        re.IGNORECASE,
-    )
+    """
+    For each education entry, if a date range is found in the 'University' string,
+    extract and remove it, storing in 'Start Date' and 'End Date'.
+    """
     for edu in education_list:
+        if not isinstance(edu, dict):  # Ensure edu is a dictionary
+            print(f"Unexpected data format in education_list: {edu}")
+            continue  # Skip invalid entries
+        
         uni_text = edu.get("University", "")
         if uni_text:
             match = DATE_PATTERN_EDU.search(uni_text)
@@ -154,6 +198,7 @@ def postprocess_education_dates(education_list):
                 edu["Start Date"] = match.group(1).strip()
                 edu["End Date"] = match.group(2).strip()
                 edu["University"] = DATE_PATTERN_EDU.sub("", uni_text).strip()
+    
     return education_list
 
 

@@ -96,12 +96,15 @@ def parse_resume(file_path):
         "Phone": personal_info["Phone"],
         "Experience": [
             {key: clean_text(value) if isinstance(value, str) else value for key, value in exp.items()}
-            for exp in experience_list
+            for exp in experience_list if isinstance(exp, dict)  # Ensures exp is a dictionary
         ],
+
+
         "Education": [
             {key: clean_text(value) if isinstance(value, str) else value for key, value in edu.items()}
-            for edu in education_list
-        ],
+            for edu in education_list if isinstance(edu, dict)  # ✅ Skips invalid entries
+        ]
+,
         "Skills": cleaned_skills or ["No skills data available"],
         "Projects": structured_projects,
         "Extracurricular Activities": extracurricular,
@@ -119,7 +122,7 @@ def save_to_csv(parsed_data, output_csv="parsed_resumes.csv"):
 
 # Run the Parser if needed
 if __name__ == "__main__":
-    resume_path = "sample_resume.pdf"  # Change to your actual resume file
+    resume_path = "AhmedEssamCV 1.pdf"  # Change to your actual resume file
     parsed_data, sections = parse_resume(resume_path)
     save_to_csv(parsed_data)
     print(json.dumps(parsed_data, indent=2))
